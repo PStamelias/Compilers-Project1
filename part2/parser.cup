@@ -1,0 +1,125 @@
+/* Simple +/-/* expression language; parser evaluates constant expressions on the fly*/
+/**
+ *  Package and Import Specifications
+ */
+import java_cup.runtime.*;
+
+/**
+ *  Usercode Components
+ */
+parser code {:
+    // Connect this parser to a scanner!
+    Scanner s;
+    Parser(Scanner s){ this.s=s; }
+:}
+
+/* define how to connect to the scanner! */
+scan with {: return s.next_token(); :};
+
+/**
+ *  Symbol Lists
+ */
+
+/* Terminals (tokens returned by the scanner). */
+terminal           PLUS,IF,ELSE,LBRUCKET,REVERSE,RBRUCKET,COMMA,LPAREN,RPAREN,ID,PREFIX;
+terminal String    STRING_WORD ;        
+
+/*  Non terminals */
+non terminal     FunB;
+non terminal     Start;      // used to store evaluated subexpressions
+non terminal     String A,B,FunA;	
+non terminal     expr,command,expr_if,FunC,expr1,DE,DE2;
+/**
+ *  Precedence Declarations
+ */
+
+/**
+ *  The Grammar Rules
+ */
+Start        ::=   A:g {:System.out.println("public class Main {\n"+g+"\n}");:}
+              ;
+
+
+A            ::= FunA:e A:a                                                                      {:RESULT=e+a;:}
+              | B:b                                                                              {:RESULT="\tpublic static void main(String[] args) { " + b+"\n\t}\n";:}
+              ;
+FunA         ::= ID:id1 LPAREN expr:ex RPAREN LBRUCKET command:com RBRUCKET                      {:RESULT="\tpublic static String " + id1 + "("+ ex +")"+ "{\n\t\t" +"return "+com+" ; " +"\n\t"+"}\n";:} 
+              |  ID:id1 LPAREN  RPAREN LBRUCKET command:com RBRUCKET                             {:RESULT="\tpublic static String " + id1 + "("+")"+ "{\n\t\t"+"return "+com +" ; "+"\n\t" +"}\n";:} 
+              ;
+
+expr         ::= ID:a COMMA expr:e  {:RESULT="String "+a+","+e;:}
+              |  ID:a               {:RESULT="String "+a;:}
+              ;	
+command      ::= IF LPAREN expr_if:exif RPAREN command:c1 ELSE command:c2                              {:RESULT="("+exif+")"+" ? "+c1+" : "+c2;:}
+              | FunC:fc                                                                                {:RESULT=fc;:}                                                                          
+              ;
+
+expr_if      ::=expr1:ex1 PREFIX expr1:ex2                                                                {:RESULT=ex1+".startsWith("+ex2+")";:}
+              ;
+
+expr1        ::=ID:id1 LPAREN expr1:ex1 RPAREN                                                            {:RESULT=id1+"("+ex1+")";:}
+              | ID:id1 LPAREN  RPAREN                                                                     {:RESULT=id1+"("+")";:}
+              | ID:id1 COMMA expr1:ex1                                                                    {:RESULT=id1+","+ex1;:}
+	      | REVERSE  expr1:Ex1                                                                        {:RESULT="(new StringBuffer("+Ex1+")"+".reverse())"+".toString()";:}
+              | STRING_WORD:s1                                                                            {:RESULT=s1;:}
+              | ID:id1                                                                                    {:RESULT=id1;:}
+              ;
+
+
+
+FunC         ::= ID:id1  LPAREN  FunC:fc RPAREN                                                             {:RESULT=id1+"("+fc+")";:}                     
+              |  ID:id PLUS command:d                                     			            {:RESULT=id+"+"+"("+d+")";:}
+              |  ID:id1 LPAREN  RPAREN COMMA  FunC:b                                                        {:RESULT=id1+"("+")"+","+b;:}
+              |  ID:id1 LPAREN  RPAREN                                                                      {:RESULT=id1+"("+")";:}
+	      |  STRING_WORD:s1 PLUS command:d                                                              {:RESULT=s1+"+"+"("+d+")";:}
+              |  STRING_WORD:s1 COMMA FunC:b                                                                {:RESULT=s1+","+b;:}
+              |  STRING_WORD:s1                                                                             {:RESULT=s1;:}                                                                 
+              |  REVERSE DE2:d                                                                              {:RESULT="(new StringBuffer("+d+".reverse())"+".toString()";:}
+              |  REVERSE DE2:d  PLUS FunC:C                                                                 {:RESULT="(new StringBuffer("+d+".reverse())"+".toString()"+"+"+C;:}
+              |  ID:id1 COMMA FunC:fc                                                                       {:RESULT=id1+","+fc;:}
+	      |  ID:id                                                                                      {:RESULT=id;:}                                                                                 
+              ;
+
+
+
+B              ::= FunB:fund_re B:b                                                                        {:RESULT="\n\t\tSystem.out.println("+fund_re+");"+b;:}
+                |                                                                                          {:RESULT="\0";:}
+                ;
+
+
+
+
+
+FunB          ::= ID:id1 LPAREN FunB:b  RPAREN                                                             {:RESULT=id1+"("+b+")";:}
+               |  ID:id1 LPAREN  RPAREN COMMA  FunB:b                                                      {:RESULT=id1+"("+")"+","+b;:}
+               |  ID:id1 LPAREN FunB:b RPAREN COMMA FunB:d                                                 {:RESULT=id1+"("+b+")"+","+d;:}
+               |  ID:id1 LPAREN FunB:b  RPAREN PLUS FunB:d                                                 {:RESULT=id1+"("+b+")"+"+"+d;:}
+               |  ID:id1 LPAREN  RPAREN   PLUS FunB:d                                                      {:RESULT=id1+"("+")"+"+"+d;:}
+	       |  ID:id1 LPAREN  RPAREN                                                                    {:RESULT=id1+"("+")";:}
+               |  STRING_WORD:s1 PLUS FunB:b                                                               {:RESULT=s1+"+"+"("+b+")";:}
+               |  STRING_WORD:s1 COMMA FunB:b                                                              {:RESULT=s1+","+b;:}
+               |  STRING_WORD:s1                                                                           {:RESULT=s1;:}
+               |  REVERSE DE:d                                                                             {:RESULT="(new StringBuffer("+d+".reverse())"+".toString()";:}
+               |  REVERSE DE:d PLUS FunB:b                                                                 {:RESULT="(new StringBuffer("+d+".reverse())"+".toString()"+"+"+b;:}
+	       |  IF LPAREN expr_if:exif RPAREN FunB:c1 ELSE FunB:c2                                       {:RESULT="("+exif+")"+" ? "+c1+" : "+c2;:}
+               ;
+
+
+
+
+DE            ::= REVERSE DE:d                                                                             {:RESULT=d+")"+".reverse()";:}                                                                 
+               | ID:id1 LPAREN FunB:b  RPAREN                                                              {:RESULT=id1+"("+b+")"+")";:}
+               | ID:id1 LPAREN RPAREN                                                                      {:RESULT=id1+"("+")"+")";:}
+	       | STRING_WORD:s1                                                                            {:RESULT=s1+")";:}
+               ;  
+
+
+DE2          ::= REVERSE DE2:d                                                                             {:RESULT=d+".reverse()";:}                                                                
+               | ID:id1 LPAREN FunC:b  RPAREN                                                              {:RESULT=id1+"("+b+")"+")";:}
+               | ID:id1 LPAREN RPAREN                                                                      {:RESULT=id1+"("+")"+")";:}
+	       | ID:id1                                                                                    {:RESULT=id1+")";:}
+	       | STRING_WORD:s1                                                                            {:RESULT=s1+")";:}                                                                  
+               ;  
+
+
+
